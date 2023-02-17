@@ -1,0 +1,18 @@
+[
+  {
+    "Name": "Bord A",
+    "Capacity": 6
+  },
+  {
+    "Name": "Bord B",
+    "Capacity": 8
+  },
+  {
+    "Name": "Bord C",
+    "Capacity": 4
+  },
+  {
+    "Name": "Bord D",
+    "Capacity": 2
+  }
+]

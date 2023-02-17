@@ -1,88 +1,90 @@
-﻿
-using System.Text.Json;
+﻿using System.Text.Json;
 using Fixbookings;
 
-//  Setting up the tables, and creating our reference-file in a json-format. 
-var tables = SetupHandler.CreateTables();
-FileHandler.WriteToFile(tables, args[0]);
-var reservationList = SetupHandler.PopulateReservationList();
-
-
-
-
-// Version 2.0!
-
-var tableListString = FileHandler.ReadFile(args[0]);
-var tablesJson = JsonSerializer.Deserialize<List<TableModel>>(tableListString);
-
-for (var index = 0; index < tablesJson.Count; index++)
+var errormessage = @"Feil input gitt...
+<filnavn> <filnavn> <time> <minutt '00' eller '30'> <antall personer> <navn> <tlf.nr>
+Eksempel: bord.json bookings.json 16 00 4 ""Ola Nordmann"" ""99112233"".";
+if (args.Length is not (4 or 7))
 {
-    var table = tables[index];
-    Console.WriteLine($"Table {index+1}: {table.Name}, Capacity: {table.Capacity}");
+    Console.WriteLine(errormessage);
+    return;
 }
+
+var path = $"C:\\Users\\rober\\RiderProjects\\RestaurantBookingSystemApp\\Fixbookings\\";
+var tablePath = path + args[0];
+var reservationPath = path + args[1];
+var tables = JsonSerializer.Deserialize<List<Table>>(FileHandler.ReadFile(tablePath)) ??
+             throw new ArgumentNullException(
+                 $"JsonSerializer.Deserialize<List<Table>>(FileHandler.ReadFile(tablePath))");
 
 if (args.Length == 4)
 {
-    BookingHandler.ShowReservations(reservationList, 15,00);
+    if (File.Exists(reservationPath)) BookingHandler.ShowReservations(args, reservationPath);
+    else
+    {
+        Console.WriteLine($"Ingen reservasjoner funnet.");
+        Console.ReadLine();
+        return;
+    }
 }
 
-
-if (args.Length == 7) // args[] = table-filename, reservationlist-filename, hour, minute, peopleCount, name, number.
+if (args.Length == 7)
 {
-    if (BookingHandler.IsBookingAvailable(reservationList, 17,00) > 0)
+    List<Reservation> reservations;
+    var matchingTables = tables.Where(t => t.Capacity >= Convert.ToInt32(args[4])).ToList();
+    if (matchingTables.Count == 0)
     {
-        Console.WriteLine("Tidspunktet er ledig!");
-        reservationList.Add(BookingHandler.AddReservation(17, 00, 2, "Bob Olav", "55599999", "TestBord 1(før bordsjekk)"));
+        Console.WriteLine("Ingen bord matcher denne bestillingen.");
+        Console.ReadLine();
+        
+        return;
+    }
+
+    if (File.Exists(reservationPath))
+    {
+        try
+        {
+            reservations = JsonSerializer.Deserialize<List<Reservation>>(FileHandler.ReadFile(reservationPath)) ??
+                           throw new InvalidOperationException();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            Console.WriteLine("Klarte ikke hente data fra JSON-fil.");
+            throw;
+        }
     }
     else
     {
-        BookingHandler.HandleUnavailableBooking();
-        BookingHandler.ShowReservations(reservationList, 15,00);
+        var newReservasion = BookingHandler.AddReservation(args, matchingTables);
+        if (newReservasion != null)
+        {
+            reservations = new List<Reservation> { newReservasion };
+            FileHandler.WriteToFile(reservations, reservationPath);
+        }
+        return;
+    }
+    
+    var availableTables = BookingHandler.GetAvailableTables(reservations, matchingTables, args);
+    if (availableTables == null || availableTables.Count == 0)
+    {
+        Console.WriteLine("Ingen ledige bord til denne tiden som samsvarer med antall personer.");
+    }
+    else
+    {
+        var newReservation = BookingHandler.AddReservation(args, availableTables);
+        if (newReservation != null)
+        {
+            reservations.Add(newReservation);
+            FileHandler.WriteToFile(reservations, reservationPath);
+        }
+        else
+        {
+            return;
+        }
     }
 }
 
-
-Console.WriteLine("Printer ut alle reservasjoner: ");
-
-foreach (var b in reservationList)
-{
-    Console.WriteLine($"{b.ReservedTable}: {b.ReservationOwnerName}, tlf {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute.ToString("00")} - {b.ReservationTimeHour+2}:{b.ReservationTimeMinute.ToString("00")}.");
-}
-
-Console.WriteLine();
-Console.WriteLine();
-Console.WriteLine(@"Vil du lagre data?
-
-[Y]es
-[N]o
-
-");
-var saveInput = Console.ReadKey();
-
-if (saveInput.Key == ConsoleKey.Y)
-{
-    Console.Clear();
-    Console.WriteLine($"You pressed {saveInput.Key.ToString()}");
-    Console.WriteLine("Saving data...");
-    FileHandler.WriteToFile(reservationList, "newlySavedReservasions.json");
-}
-
-Console.WriteLine();
-Console.WriteLine();
-Console.WriteLine(@"Vil du vise data som string?
-
-[Y]es
-[N]o
-
-");
-var showInput = Console.ReadKey();
-if (showInput.Key == ConsoleKey.Y)
-{
-    Console.Clear();
-    Console.WriteLine($"You pressed {showInput.Key.ToString()}");
-    Console.WriteLine();
-    FileHandler.PrintBookings("newlySavedReservasions.json");
-}
 
 
 // A polite way to exit the program =)

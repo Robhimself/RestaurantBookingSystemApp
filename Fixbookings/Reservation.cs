@@ -1,6 +1,6 @@
 ﻿namespace Fixbookings;
 
-public class ReservationModel
+public class Reservation
 {
     public int ReservationTimeHour { get; }
     public int ReservationTimeMinute { get; }
@@ -9,7 +9,7 @@ public class ReservationModel
     public string ReservationOwnerPhoneNumber { get; }
     public string ReservedTable { get; }
 
-    public ReservationModel(int reservationTimeHour, int reservationTimeMinute, int reservationAmountOfPeople, string reservationOwnerName, string reservationOwnerPhoneNumber, string reservedTable)
+    public Reservation(int reservationTimeHour, int reservationTimeMinute, int reservationAmountOfPeople, string reservationOwnerName, string reservationOwnerPhoneNumber, string reservedTable)
     {
         ReservationTimeHour = reservationTimeHour;
         ReservationTimeMinute = reservationTimeMinute;

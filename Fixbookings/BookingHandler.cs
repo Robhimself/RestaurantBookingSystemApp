@@ -1,59 +1,76 @@
-﻿namespace Fixbookings;
+﻿using System.Text.Json;
+
+namespace Fixbookings;
 
 public class BookingHandler
 {
-    public static ReservationModel AddReservation(int hour, int minute, int amount, string name, string number, string table)
+    public static Reservation? AddReservation(string[] args, List<Table> matchingTables)
     {
-        Console.WriteLine($"Booket bord til {amount} personer kl. {hour}:{minute.ToString("00")} - {hour+2}:{minute.ToString("00")}");
-        return new ReservationModel(hour, minute, amount, name, number, table);
+        var tables = matchingTables.OrderBy(t => t.Capacity).ToList();
+        if (int.TryParse(args[2], out var hour) && int.TryParse(args[3], out var minute) &&
+            int.TryParse(args[4], out var amount))
+        {
+        var name = args[5];
+        var number = args[6];
+
+        Console.WriteLine($"Booket bord til {amount} personer kl. {hour}:{minute:00} - {hour+2}:{minute:00}");
+        return new Reservation(hour, minute, amount, name, number, tables[0].Name);
+            
+        }
+
+        Console.WriteLine("Input i bestilling inneholder feil format.");
+        Console.WriteLine(@"Eks: bord.json reservasjon.json 15 00 2 ""Fullt Navn"" ""tlfnr"".");
+        Console.ReadLine();
+        
+        return null;
     }
 
-    public static void ShowReservations(List<ReservationModel> list, int hour, int minute)
+    public static void ShowReservations(string[] args, string path)
     {
-        Console.WriteLine($"Viser alle reservasjoner innenfor kl.{hour}:{minute.ToString("00")}"); 
         
-        // 14:00 - 16:00 (sjekke fra 12:30 til 15:30)
-        // 14:30 - 16:30 (sjekke fra 13:00 - 16:00)
+        var reservations = JsonSerializer.Deserialize<List<Reservation>>(FileHandler.ReadFile(path)) ??
+                           throw new ArgumentNullException(
+                               $"JsonSerializer.Deserialize<List<Reservation>>(FileHandler.ReadFile(path))");
         
-        foreach (var b in list)
+        if (int.TryParse(args[2], out var hour) && int.TryParse(args[3], out var minute))
         {
-            // more logic needed in these if checks !!!
-            
-            if (minute == 30) // 14:30
+            Console.WriteLine($"Viser alle reservasjoner kl.{args[2]}:{args[3]}");
+            foreach (var b in reservations.Where(
+                         b => b.ReservationTimeHour == hour && b.ReservationTimeMinute == minute))
             {
-                if (b.ReservationTimeHour <= (hour+2) && b.ReservationTimeHour > (hour-2)) 
-                {
-                    Console.WriteLine($"{b.ReservedTable}: {b.ReservationOwnerName}, tlf. {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute.ToString("00")} - {b.ReservationTimeHour+2}:{b.ReservationTimeMinute.ToString("00")}.");
-                }
+                Console.WriteLine(
+                    $"{b.ReservedTable}: {b.ReservationOwnerName}, tlf. {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute:00} - {b.ReservationTimeHour + 2}:{b.ReservationTimeMinute:00}.");
             }
-            else // 14:00
-            {
-                if (b.ReservationTimeHour < (hour+2) && b.ReservationTimeHour >= (hour-2))
-                {
-                    Console.WriteLine($"{b.ReservedTable}: {b.ReservationOwnerName}, tlf {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute.ToString("00")} - {b.ReservationTimeHour+2}:{b.ReservationTimeMinute.ToString("00")}.");
-                }
-            }
-
+        }
+        else
+        {
+            Console.WriteLine("Bruk kun tall i klokkeslett. Eks: 16 00");
         }
     }
 
-    public static void HandleUnavailableBooking()
-    {
-        Console.WriteLine("Ingen ledige bord til denne tiden som samsvarer med antall personer.");
-    }
 
     
-    public static int IsBookingAvailable(List<ReservationModel> list, int hour, int minute)
+    
+    public static List<Table>? GetAvailableTables(List<Reservation> reservations, List<Table> tables, string[] args)
     {
-        var trueCounter = 0;
-        
-        foreach (var booking in list)
+        if (int.TryParse(args[2], out var hour) && int.TryParse(args[3], out var minute))
         {
-            // Need more logic in if statement...
-            if (booking.ReservationTimeHour <= hour - 2 || booking.ReservationTimeHour > hour + 2) trueCounter++;
+            var list = new List<Reservation>(reservations.Where(r => r.ReservationTimeHour == hour && r.ReservationTimeMinute == minute));
+            var tableList = new List<Table>(tables);
+
+            for (var i = list.Count - 1; i >= 0; i--)
+            {
+                var r = list[i];
+                foreach (var t in tables.Where(t => r.ReservedTable == t.Name))
+                {
+                    tableList.Remove(t);
+                }
+            }
+            return tableList;
         }
 
-        return trueCounter;
+        Console.WriteLine("Bruk kun tall i klokkeslett. Eks: 16 00");
+        return null;
     }
 }
 
