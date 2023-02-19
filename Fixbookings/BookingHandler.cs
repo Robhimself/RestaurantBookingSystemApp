@@ -30,11 +30,11 @@ Fixbookings.exe bord.json bookings.json 16 00 4 ""Ola Nordmann"" ""99112233"".
     {
         if (commands.Length == 4)
         {
-            this.Constructor(commands[0], commands[1], commands[2], commands[3], null,null,null);
+            Init(commands[0], commands[1], commands[2], commands[3], null,null,null);
         }
         else if (commands.Length == 7)
         {
-            this.Constructor(commands[0], commands[1], commands[2], commands[3], commands[4], commands[5],
+            Init(commands[0], commands[1], commands[2], commands[3], commands[4], commands[5],
                 commands[6]);
         }
         else
@@ -45,71 +45,6 @@ Fixbookings.exe bord.json bookings.json 16 00 4 ""Ola Nordmann"" ""99112233"".
             throw new ArgumentException("Feil antall inputs ble tastet inn.");
         }
     }
-
-
-    private void Constructor(string tableFile, string bookingFile, string hourString, string minuteString,
-        string? numberOfPeople, string? name, string? phoneNumber)
-    {
-        // If you do not want to add tables.json in /bin/Debug/net6.0/
-        // Then uncomment (remove "//") at the beginning of the line below.
-        // tableFile = $"../../../{tableFile}";
-        TableJsonFileName = tableFile;
-        ReservationJsonFileName = bookingFile;
-
-        if (File.Exists(ReservationJsonFileName))
-        {
-            var reservationsJsonString = File.ReadAllText(ReservationJsonFileName);
-            if (!string.IsNullOrWhiteSpace(reservationsJsonString))
-            {
-                try
-                {
-                    _reservationList = JsonSerializer.Deserialize<List<Reservation>>(reservationsJsonString);
-                }
-                catch (ArgumentException e)
-                {
-                    Console.WriteLine(e);
-                    Console.WriteLine($"Kunne ikke lese av {ReservationJsonFileName}...");
-                    Console.ReadLine();
-                    
-                    throw;
-                }
-            }
-        }
-
-        if (numberOfPeople != null && name != null && phoneNumber != null)
-        {
-            int.TryParse(numberOfPeople, out _numberOfPeople);
-            _name = name;
-            _phoneNumber = phoneNumber;
-            if (!File.Exists(TableJsonFileName))
-            {
-                Console.WriteLine("Finner ikke fil med bord-informasjon...");
-                Console.ReadLine();
-                
-                return;
-            }
-            var tableJsonString = File.ReadAllText(TableJsonFileName);
-            if (!string.IsNullOrWhiteSpace(tableJsonString))
-            {
-                try
-                {
-                    TableList = JsonSerializer.Deserialize<List<Table>>(tableJsonString);
-                }
-                catch (ArgumentException e)
-                {
-                    Console.WriteLine(e);
-                    Console.WriteLine($"Kunne ikke lese av {TableJsonFileName}...");
-                    throw;
-                }
-            }
-        }
-
-        int.TryParse(hourString, out var hour);
-        int.TryParse(minuteString, out var minute);
-        BookingHour = hour;
-        BookingMinute = minute;
-    }
-    
     
     public void AddReservation()
     {
@@ -140,6 +75,108 @@ Fixbookings.exe bord.json bookings.json 16 00 4 ""Ola Nordmann"" ""99112233"".
         _reservationList.Add(new Reservation(BookingHour, BookingMinute, _numberOfPeople, _name, _phoneNumber, chosenTable.Name));
     }
     
+    public void ShowReservations()
+    {
+        if (_reservationList.Count > 0)
+        {
+            if ((BookingHour is >= 0 and <= 24) && (BookingMinute is 00 or 30))
+            {
+                Console.WriteLine($"Viser alle reservasjoner kl.{BookingHour}:{BookingMinute:00}");
+                foreach (var b in _reservationList.Where(
+                             b => b.ReservationTimeHour == BookingHour && b.ReservationTimeMinute == BookingMinute))
+                {
+                    Console.WriteLine(
+                        $"{b.ReservedTable}: {b.ReservationOwnerName}, tlf. {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute:00} - {b.ReservationTimeHour + 2}:{b.ReservationTimeMinute:00}.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Klokkeslettet som er tastet inn er feil.");
+                Console.WriteLine(WrongInputsMessage);
+            }
+        }
+        else
+        {
+            Console.WriteLine("Ingen reservasjoner funnet.");
+        }
+    }
+
+    public void SaveToFile()
+    {
+        var options = new JsonSerializerOptions() { WriteIndented = true };
+        var jsonString = JsonSerializer.Serialize(_reservationList, options);
+
+        if (string.IsNullOrEmpty(ReservationJsonFileName) || !ReservationJsonFileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            ReservationJsonFileName = "reservationDefaultName.json";
+        }
+
+        File.WriteAllText(ReservationJsonFileName, jsonString);
+    }
+    
+    private void Init(string tableFile, string bookingFile, string hourString, string minuteString,
+    string? numberOfPeople, string? name, string? phoneNumber)
+{
+    // If you do not want to add tables.json in /bin/Debug/net6.0/
+    // Then uncomment (remove "//") at the beginning of the line below.
+    // tableFile = $"../../../{tableFile}";
+    TableJsonFileName = tableFile;
+    ReservationJsonFileName = bookingFile;
+
+    if (File.Exists(ReservationJsonFileName))
+    {
+        var reservationsJsonString = File.ReadAllText(ReservationJsonFileName);
+        if (!string.IsNullOrWhiteSpace(reservationsJsonString))
+        {
+            try
+            {
+                _reservationList = JsonSerializer.Deserialize<List<Reservation>>(reservationsJsonString);
+            }
+            catch (ArgumentException e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine($"Kunne ikke lese av {ReservationJsonFileName}...");
+                Console.ReadLine();
+                
+                throw;
+            }
+        }
+    }
+
+    if (numberOfPeople != null && name != null && phoneNumber != null)
+    {
+        int.TryParse(numberOfPeople, out _numberOfPeople);
+        _name = name;
+        _phoneNumber = phoneNumber;
+        if (!File.Exists(TableJsonFileName))
+        {
+            Console.WriteLine("Finner ikke fil med bord-informasjon...");
+            Console.ReadLine();
+            
+            return;
+        }
+        var tableJsonString = File.ReadAllText(TableJsonFileName);
+        if (!string.IsNullOrWhiteSpace(tableJsonString))
+        {
+            try
+            {
+                TableList = JsonSerializer.Deserialize<List<Table>>(tableJsonString);
+            }
+            catch (ArgumentException e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine($"Kunne ikke lese av {TableJsonFileName}...");
+                throw;
+            }
+        }
+    }
+
+    int.TryParse(hourString, out var hour);
+    int.TryParse(minuteString, out var minute);
+    BookingHour = hour;
+    BookingMinute = minute;
+}
+    
     private List<Table> GetAvailableTables(List<Table> tables)
     {
         var list = GetReservationsInSameTimeFrame();
@@ -164,45 +201,6 @@ Fixbookings.exe bord.json bookings.json 16 00 4 ""Ola Nordmann"" ""99112233"".
     private List<Reservation> GetReservationsInSameTimeFrame()
     {
         return new List<Reservation>(_reservationList.Where(r => r.ReservationTimeHour == BookingHour && r.ReservationTimeMinute == BookingMinute));
-    }
-    
-    public void ShowReservations()
-    {
-        if (_reservationList.Count > 0)
-        {
-            if ((BookingHour is >= 0 and <= 24) && (BookingMinute is 00 or 30))
-            {
-                Console.WriteLine($"Viser alle reservasjoner kl.{BookingHour}:{BookingMinute:00}");
-                foreach (var b in _reservationList.Where(
-                             b => b.ReservationTimeHour == BookingHour && b.ReservationTimeMinute == BookingMinute))
-                {
-                    Console.WriteLine(
-                        $"{b.ReservedTable}: {b.ReservationOwnerName}, tlf. {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute:00} - {b.ReservationTimeHour + 2}:{b.ReservationTimeMinute:00}.");
-                }
-            }
-            else
-            {
-                Console.WriteLine("Klokkeslettet som er tastet inn er feil.");
-                Console.WriteLine(WrongInputsMessage);
-            }
-        }
-        else
-        {
-                Console.WriteLine("Ingen reservasjoner funnet.");
-        }
-    }
-
-    public void SaveToFile()
-    {
-        var options = new JsonSerializerOptions() { WriteIndented = true };
-        var jsonString = JsonSerializer.Serialize(_reservationList, options);
-
-        if (string.IsNullOrEmpty(ReservationJsonFileName) || !ReservationJsonFileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-        {
-            ReservationJsonFileName = "reservationDefaultName.json";
-        }
-
-        File.WriteAllText(ReservationJsonFileName, jsonString);
     }
 }
 
