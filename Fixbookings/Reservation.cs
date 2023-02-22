@@ -2,20 +2,27 @@
 
 public class Reservation
 {
-    public int ReservationTimeHour { get; }
-    public int ReservationTimeMinute { get; }
-    public int ReservationAmountOfPeople { get; }
-    public string ReservationOwnerName { get; }
-    public string ReservationOwnerPhoneNumber { get; }
-    public string ReservedTable { get; }
+    public int ReservationHour { get; set; }
+    public int ReservationMinute { get; set; }
+    public int NumberOfPeople { get; set; }
+    public string? Name { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string Table { get; }
 
-    public Reservation(int reservationTimeHour, int reservationTimeMinute, int reservationAmountOfPeople, string reservationOwnerName, string reservationOwnerPhoneNumber, string reservedTable)
+    public Reservation(int hour, int minute, int numberOfPeople, string? name, string? phoneNumber, string table)
     {
-        ReservationTimeHour = reservationTimeHour;
-        ReservationTimeMinute = reservationTimeMinute;
-        ReservationAmountOfPeople = reservationAmountOfPeople;
-        ReservationOwnerName = reservationOwnerName;
-        ReservationOwnerPhoneNumber = reservationOwnerPhoneNumber;
-        ReservedTable = reservedTable;
+        ReservationHour = hour;
+        ReservationMinute = minute;
+        NumberOfPeople = numberOfPeople;
+        Name = name;
+        PhoneNumber = phoneNumber;
+        Table = table;
     }
+
+    public void Show()
+    {
+        Console.WriteLine(
+            $"{Table}: {Name}, tlf. {PhoneNumber} - {ReservationHour}:{ReservationMinute:00} - {ReservationHour + 2}:{ReservationMinute:00}.");
+    }
+    
 }

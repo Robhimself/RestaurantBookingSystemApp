@@ -1,206 +1,114 @@
-﻿using System.Runtime.CompilerServices;
-using System.Text.Json;
-
-namespace Fixbookings;
+﻿namespace Fixbookings;
 
 public class BookingHandler
 {
-    private string? TableJsonFileName { get; set; }
-    private string? ReservationJsonFileName { get; set; }
-    private int BookingHour { get; set; }
-    private int BookingMinute { get; set; }
-    private int _numberOfPeople = 0;
-    private string _name = "";
-    private string _phoneNumber = "";
+    private readonly string _tableJsonFileName;
+    private readonly string _reservationJsonFileName;
+    private readonly int _hour;
+    private readonly int _minute;
+    private readonly int _numberOfPeople;
+    private readonly string? _name;
+    private readonly string? _phoneNumber;
 
-    public List<Table> TableList = new();
+    private readonly FileHandler _fileHandler = new();
+    private List<Table>? _tableList;
     private List<Reservation> _reservationList = new();
 
-    private const string WrongInputsMessage = @"
-For å sjekke reservasjoner: <program.exe> <filnavn> <filnavn> <time> <minutt '00' eller '30'>
-Eksempel: 
-Fixbookings.exe bord.json bookings.json 16 00
-
-For å legge til reservasjon: <program.exe> <filnavn> <filnavn> <time> <minutt '00' eller '30'> <antall personer> <navn> <tlf.nr>
-Eksempel:
-Fixbookings.exe bord.json bookings.json 16 00 4 ""Ola Nordmann"" ""99112233"".
-";
     
-    public BookingHandler(string?[] commands)
+    public BookingHandler(string tableFileName, string reservationFileName, int hour, int minute)
     {
-        if (commands.Length == 4)
-        {
-            Init(commands[0], commands[1], commands[2], commands[3], null,null,null);
-        }
-        else if (commands.Length == 7)
-        {
-            Init(commands[0], commands[1], commands[2], commands[3], commands[4], commands[5],
-                commands[6]);
-        }
-        else
-        {
-            Console.WriteLine(WrongInputsMessage);
-            Console.ReadLine();
-            
-            throw new ArgumentException("Feil antall inputs ble tastet inn.");
-        }
+        _tableJsonFileName = tableFileName;
+        _reservationJsonFileName = reservationFileName;
+        _hour = hour;
+        _minute = minute;
+        LoadReservationData();
     }
     
-    public void AddReservation()
+    public BookingHandler(string tableFileName, string reservationFileName, int hour, int minute, int amount, string? name,
+        string? phoneNumber)
     {
-        Table chosenTable;
-        var tables = GetMatchingTables().OrderBy(t => t.Capacity).ToList();
-        
-        if (tables.Count == 0)
-        {
-            Console.WriteLine("Ingen bord passer med ønsket antall personer i bestillingen.");
-            return;
-        }
-
-        if (_reservationList.Count == 0)
-        {
-            chosenTable = tables[0];
-        }
-        else
-        {
-            var availableTables = new List<Table>(GetAvailableTables(tables)).OrderBy(t => t.Capacity).ToList();
-            if (availableTables.Count == 0)
-            {
-                Console.WriteLine("Ingen ledige bord til denne tiden som samsvarer med antall personer.");
-                return;
-            }
-            chosenTable = availableTables[0];
-        }
-        Console.WriteLine($"Booket bord til {_numberOfPeople} personer kl. {BookingHour}:{BookingMinute:00} - {BookingHour+2}:{BookingMinute:00}");
-        _reservationList.Add(new Reservation(BookingHour, BookingMinute, _numberOfPeople, _name, _phoneNumber, chosenTable.Name));
+        _tableJsonFileName = tableFileName;
+        _reservationJsonFileName = reservationFileName;
+        _hour = hour;
+        _minute = minute;
+        _numberOfPeople = amount;
+        _name = name;
+        _phoneNumber = phoneNumber;
+        LoadReservationData();
+        LoadTableData();
     }
     
     public void ShowReservations()
     {
-        if (_reservationList.Count > 0)
+        if (_reservationList is { Count: > 0 })
         {
-            if ((BookingHour is >= 0 and <= 24) && (BookingMinute is 00 or 30))
+            foreach (var r in _reservationList.Where(r => r.ReservationHour == _hour && r.ReservationMinute == _minute))
             {
-                Console.WriteLine($"Viser alle reservasjoner kl.{BookingHour}:{BookingMinute:00}");
-                foreach (var b in _reservationList.Where(
-                             b => b.ReservationTimeHour == BookingHour && b.ReservationTimeMinute == BookingMinute))
-                {
-                    Console.WriteLine(
-                        $"{b.ReservedTable}: {b.ReservationOwnerName}, tlf. {b.ReservationOwnerPhoneNumber} - {b.ReservationTimeHour}:{b.ReservationTimeMinute:00} - {b.ReservationTimeHour + 2}:{b.ReservationTimeMinute:00}.");
-                }
+                r.Show();
             }
-            else
-            {
-                Console.WriteLine("Klokkeslettet som er tastet inn er feil.");
-                Console.WriteLine(WrongInputsMessage);
-            }
-        }
-        else
-        {
-            Console.WriteLine("Ingen reservasjoner funnet.");
-        }
-    }
-
-    public void SaveToFile()
-    {
-        var options = new JsonSerializerOptions() { WriteIndented = true };
-        var jsonString = JsonSerializer.Serialize(_reservationList, options);
-
-        if (string.IsNullOrEmpty(ReservationJsonFileName) || !ReservationJsonFileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-        {
-            ReservationJsonFileName = "reservationDefaultName.json";
-        }
-
-        File.WriteAllText(ReservationJsonFileName, jsonString);
-    }
-    
-    private void Init(string tableFile, string bookingFile, string hourString, string minuteString,
-    string? numberOfPeople, string? name, string? phoneNumber)
-{
-    // If you do not want to add tables.json in /bin/Debug/net6.0/
-    // Then uncomment (remove "//") at the beginning of the line below.
-    // tableFile = $"../../../{tableFile}";
-    TableJsonFileName = tableFile;
-    ReservationJsonFileName = bookingFile;
-
-    if (File.Exists(ReservationJsonFileName))
-    {
-        var reservationsJsonString = File.ReadAllText(ReservationJsonFileName);
-        if (!string.IsNullOrWhiteSpace(reservationsJsonString))
-        {
-            try
-            {
-                _reservationList = JsonSerializer.Deserialize<List<Reservation>>(reservationsJsonString);
-            }
-            catch (ArgumentException e)
-            {
-                Console.WriteLine(e);
-                Console.WriteLine($"Kunne ikke lese av {ReservationJsonFileName}...");
-                Console.ReadLine();
-                
-                throw;
-            }
-        }
-    }
-
-    if (numberOfPeople != null && name != null && phoneNumber != null)
-    {
-        int.TryParse(numberOfPeople, out _numberOfPeople);
-        _name = name;
-        _phoneNumber = phoneNumber;
-        if (!File.Exists(TableJsonFileName))
-        {
-            Console.WriteLine("Finner ikke fil med bord-informasjon...");
-            Console.ReadLine();
-            
             return;
         }
-        var tableJsonString = File.ReadAllText(TableJsonFileName);
-        if (!string.IsNullOrWhiteSpace(tableJsonString))
+        Console.WriteLine("Ingen reservasjoner funnet.");
+    }
+    
+    public void AddReservation()
+    {
+        var availableTables = GetAvailableTables().OrderBy(t => t.Capacity).ToList();
+        if (availableTables.Count < 1)
         {
-            try
-            {
-                TableList = JsonSerializer.Deserialize<List<Table>>(tableJsonString);
-            }
-            catch (ArgumentException e)
-            {
-                Console.WriteLine(e);
-                Console.WriteLine($"Kunne ikke lese av {TableJsonFileName}...");
-                throw;
-            }
+            Console.WriteLine("Ingen bord ledig.");
+            return;
         }
-    }
+        
+        var chosenTable = availableTables[0];
+        _reservationList.Add(new Reservation(_hour, _minute, _numberOfPeople, _name, _phoneNumber, chosenTable.Name));
 
-    int.TryParse(hourString, out var hour);
-    int.TryParse(minuteString, out var minute);
-    BookingHour = hour;
-    BookingMinute = minute;
-}
+        Console.WriteLine($@"Booket ""{chosenTable.Name}"" til {_numberOfPeople} personer kl. {_hour}:{_minute:00} - {_hour+2}:{_minute:00}");
+        
+        // Saving file in the same folder as the .exe-file is running.
+        _fileHandler.WriteToFile(_reservationList, _reservationJsonFileName);
+
+    }
     
-    private List<Table> GetAvailableTables(List<Table> tables)
+    private List<Table>? GetAvailableTables()
     {
-        var list = GetReservationsInSameTimeFrame();
-        var tableList = new List<Table>(tables);
-    
-        for (var i = list.Count - 1; i >= 0; i--)
+        var reservations = _reservationList.Where(r => r.ReservationHour > _hour-2 && r.ReservationHour < _hour+2).ToList();
+
+        if (reservations.Count < 1)
         {
-            var r = list[i];
-            foreach (var t in tables.Where(t => r.ReservedTable == t.Name))
-            {
-                tableList.Remove(t);
-            }
+            return _tableList.Where(t => t.Capacity >= _numberOfPeople).ToList();
         }
-        return tableList;
+        
+        var reservedTableNames = reservations.Select(r => r.Table);
+        return _tableList.Where(t => !reservedTableNames.Contains(t.Name) && t.Capacity >= _numberOfPeople).ToList();
     }
     
-    private List<Table> GetMatchingTables()
+    private void LoadReservationData()
     {
-        return new List<Table>(TableList.Where(t => t.Capacity >= _numberOfPeople).ToList());
+        if (!_fileHandler.FileExists(_reservationJsonFileName))
+        {
+            Console.WriteLine("Ingen reservasjoner funnet.");
+            return;
+        }
+        
+        var list = _fileHandler.ReadFile<Reservation>(_reservationJsonFileName);
+        if (list.Count == 0) return;
+        _reservationList = new List<Reservation>(list);
     }
 
-    private List<Reservation> GetReservationsInSameTimeFrame()
+    private void LoadTableData()
     {
-        return new List<Reservation>(_reservationList.Where(r => r.ReservationTimeHour == BookingHour && r.ReservationTimeMinute == BookingMinute));
+        // Current file path as .exe-file is running.
+        if (!_fileHandler.FileExists(_tableJsonFileName))
+        {
+            Console.WriteLine($"Sjekk om filnavnet({_tableJsonFileName}) eller plasseringen er riktig.");
+            Console.ReadLine();
+            
+            //This file should exist, therefor the program will exit if the wrong file path or file name is provided.
+            Environment.Exit(1);
+        }
+        
+        var tables = _fileHandler.ReadFile<Table>(_tableJsonFileName);
+        _tableList = new List<Table>(tables);
     }
 }
-
